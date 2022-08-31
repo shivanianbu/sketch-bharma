@@ -2,17 +2,28 @@ const express= require("express")
 const router = express.Router();
 const bcrypt= require("bcryptjs")
 const User = require('../model/user')
+const {tokenGenerator, loginRequired} = require('../helper/token')
 
 router.post('/register',async(req,res) => {
 
     try{
-        const hash = bcrypt.hashSync(req.body.password, 10);
+        const { userName, email , password } = req.body
+        const userExists = await User.findOne({email: req.body.email})
+        if(!userName || !email || !password) {
+           return res.send("Please enter all the details")
+        }
+        if(userExists) {
+            return res.status(400).send('User Already Exists!');
+        }
+        const hash = bcrypt.hashSync(password, 10);
         const user =  new User({
-            userName: req.body.userName,
-            email: req.body.email,
+            userName: userName,
+            email: email,
             password: hash
         })
         const savedUser = await user.save();
+        const token = await tokenGenerator(userExists.email)
+        res.cookie("jwt",token)
         res.send(savedUser)
     }catch(err) {
         res.send(err)
@@ -23,20 +34,30 @@ router.post('/register',async(req,res) => {
 router.post('/login',async(req,res) => {
 
     try{
-        const userExists = await User.findOne({email: req.body.email})
+        const { email, password } = req.body;
+        const userExists = await User.findOne({email})
         if(!userExists){
-            res.send("User Not Exists")
+            return res.status(400).send('User Not Exists!');
+        }else if (!email || !password) {
+            return res.status(400).send("Please Enter the details ")
         } else {
-            const matchedPassword= await bcrypt.compare(req.body.password, userExists.password)
+            const matchedPassword= await bcrypt.compare(password, userExists.password)
             if(!matchedPassword) {
-                res.send("Please enter a valid password")
+                return res.status(400).send("Please enter a valid password")
+            } else {
+                const token = await tokenGenerator(userExists.email)
+                res.cookie("jwt",token)
+                res.send("LoggedIn Successfully")
             }
-            res.send("LoggedIn Successfully")
         }
-    } catch(e) {
-        res.send(e)
+    } catch(error) {
+        res.send(error)
     }
 })
 
+router.get('/logout', (req, res) => {
+    res.clearCookie('jwt');
+    return res.send("LoggedOut Successfully");
+  });
 
-module.exports= router
+module.exports= router;
