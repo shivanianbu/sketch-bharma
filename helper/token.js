@@ -26,7 +26,7 @@ const loginRequired = async(req,res,next) => {
         if(validToken) {
             next();
         }else{
-            return res.send("Unauthorized User")
+            return res.send("Please Login to Continue...")
         }
     }catch(err){
         res.send(err)
